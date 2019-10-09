@@ -1,18 +1,16 @@
 #!/usr/bin/env node
-
-const { exec } = require('child_process');
+const fs = require('fs')
+const { exec } = require('child_process')
+const { help } = require('./helpdoc.js')
+const { jsonReader, jsonWriter } = require('./utils.js')
 let appName = 'ErrorAppName'
 const template = (process.argv.slice(2) || [])[0] || ''
-let typeTemplate = 'noType'; // client or service
+let typeTemplate = 'noType' // client or service
 let templateName = 'noTempName' // template1 or template2
 
 function init() {
-    console.log(process.argv)
-
     if (template === '--help') {
-        console.log('Usage: npx hiqf [type/template] \n  ' +
-            '  -- [type] is mean client or service \n  ' +
-            '  -- [template] is mean pattern template on the repository')
+        console.log(help())
         return
     }
 
@@ -32,18 +30,32 @@ function init() {
 function checkAppName(tempName) {
     typeTemplate = tempName.split('/')[0] || ''
     templateName = tempName.split('/')[1] || ''
-    console.log('templateName ', templateName)
     if (typeTemplate !== '') {
         appName = (process.argv.slice(2) || [])[1] || 'my-hiq-app'
     }
 
 }
 
+
 function makeDir(callbackFunc) {
-    const command = `mkdir ${appName} \n cd ${appName} \n npm init --yes \n ls`;
+    const repoWithKey = `ssh-agent bash -c 'ssh-add ./id_rsa.pub git clone git@github.com:nakarinthai/electron-svelte.git .'`
+    const command = `mkdir ${appName} \n cd ${appName} \n ${repoWithKey} \n ls`
     exec(command, (error, stdout, stderr) => {
         callbackFunc({ error, stdout, stderr })
-            .then(resp => resp).catch(err => err)
+            .then(resp => {
+                jsonReader(`./${appName}/package.json`, (err, resp) => {
+                    let respval = resp
+                    if (err) {
+                        console.log(err)
+                        return
+                    }
+                    console.log(resp) // => "Infinity Loop Drive"
+                    respval.name = 'new-name'
+                    jsonWriter(`./${appName}/package.json`, JSON.stringify(respval, null, '\t'))
+
+                })
+                return resp
+            }).catch(err => err)
     })
 }
 
@@ -52,16 +64,15 @@ async function callbackMakeDir(resp) {
         if (resp.error) {
             console.error(resp.error)
             reject(resp.error)
-        };
+        }
         if (resp.stderr) {
             console.error(resp.stderr.split('mkdir:')[1])
             reject(resp.stderr)
-        };
-        mkdirStatus = true;
+        }
         resolve(resp.stdout)
     })
 
 }
 
 
-init();
+init()
